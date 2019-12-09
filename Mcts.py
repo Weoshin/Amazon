@@ -1,6 +1,6 @@
 import numpy as np
 import math
-from PrintAction import  PrintAction
+from utils.PrintAction import PrintAction
 
 EPS = 1e-8
 BLACK = -2
@@ -36,7 +36,7 @@ class Mcts:
         self.N_arrow = {}
         self.p = PrintAction(self.game)
 
-    def get_best_action(self, board):
+    def get_best_action(self, board, player):
         """
         使用白棋视角判断最优选择
         :param board:  当前棋盘
@@ -87,13 +87,13 @@ class Mcts:
         # 将局面和策略顺时针旋转180度，返回4个棋盘和策略组成的元组
         sym = self.game.get_symmetries(board, pi)
         for boards, pis in sym:
-            steps_train_data.append([boards, WHITE, pis])
+            steps_train_data.append([boards, player, pis])
 
         # 使用依概率随机策略选择下一步
         best_action = self.get_action_on_random_pi(board, pi)
         # 使用最大概率对应的值进行训练
         # best_action = self.get_action_on_max_pi(board, pi)
-        self.p.print_action(board, pi)
+        # self.p.print_action(board, pi)
         return best_action, steps_train_data
 
     def search(self, board):
