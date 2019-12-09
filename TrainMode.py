@@ -8,7 +8,7 @@ from utils.dotdict import dotdict
 from pickle import Pickler, Unpickler
 from Mcts import Mcts
 from NNet import NNet
-from PrintBoard import PrintBoard
+from utils.PrintBoard import PrintBoard
 
 BLACK = -2
 WHITE = 2
@@ -21,7 +21,7 @@ args = dotdict({
     'num_iter': 10,            # 神经网络训练次数
     'num_play_game': 10,       # 下“num_play_game”盘棋训练一次NNet
     'max_len_queue': 200000,   # 双向列表最大长度
-    'num_mcts_search': 1000,   # 从某状态模拟搜索到叶结点次数
+    'num_mcts_search': 2000,   # 从某状态模拟搜索到叶结点次数
     'max_batch_size': 20,      # NNet每次训练的最大数据量
     'Cpuct': 1,                # 置信上限函数中的“温度”超参数
     'arenaCompare': 40,
@@ -71,11 +71,10 @@ class TrainMode:
                     self.mcts = Mcts(self.game, self.nnet, self.args)
                     self.player = WHITE
                     iter_train_data += self.play_one_game()
-                    pboard.save_figure(j + 1)
+
+                    # pboard.save_figure(j + 1)
                 print('TrainMode.py-learn()', '白棋赢：', self.num_white_win, '盘；', '黑棋赢：', self.num_black_win, '盘')
-                # 打印一次迭代后给NN的数据
-                print('TrainMode.py-learn()', len(iter_train_data))
-                # save the iteration examples to the history
+
                 self.batch.append(iter_train_data)
 
             # 如果 训练数据 大于规定的训练长度，则将最旧的数据删除
@@ -85,7 +84,6 @@ class TrainMode:
                 self.batch.pop(0)
             
             # 保存训练数据
-
             self.saveTrainExamples(i - 1)
 
             # 原batch是多维列表，此处标准化batch
@@ -94,7 +92,8 @@ class TrainMode:
                 # extend() 在列表末尾一次性追加其他序列中多个元素
                 standard_batch.extend(e)
             # 打乱数据，是数据服从独立同分布（排除数据间的相关性）
-            shuffle(standard_batch)
+            # shuffle(standard_batch)
+            print('NN训练的batch：', len(standard_batch), '条数据', '                   TrainMode.py-learn()')
 
             # 这里保存的是一个temp也就是一直保存着最近一次的网络，这里是为了和最新的网络进行对弈
             self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='temp.pth.tar')
@@ -134,13 +133,13 @@ class TrainMode:
             print('---------------------------')
             print('第', play_step, '步')
             print(board)
-            pboard.print_board(board, play_step+1)
+            # pboard.print_board(board, play_step+1)
             self.mcts.episodeStep = play_step
             # 在Mcts中，始终以白棋视角选择
             transformed_board = self.game.get_transformed_board(board, self.player)
             # 进行多次mcts搜索得出来概率（以白棋视角）
             self.mcts = Mcts(self.game, self.nnet, self.args)
-            next_action, steps_train_data = self.mcts.get_best_action(transformed_board)
+            next_action, steps_train_data = self.mcts.get_best_action(transformed_board, self.player)
             one_game_train_data += steps_train_data
             te = time.time()
             if self.player == WHITE:
@@ -160,10 +159,12 @@ class TrainMode:
                 print("##### 终局 #####")
                 print(board)
 
-                pboard.print_board(board, play_step)
-
-                return [(board, pi, r*((-1)**(player != self.player))) for board, player, pi in one_game_train_data]
-
+                # pboard.print_board(board, play_step+2)
+                a = [(board, pi, r * ((-1) ** (player != self.player))) for board, player, pi in one_game_train_data]
+                # print(len(a))
+                # for i in range(len(a) // 4):
+                #     print(4 * a[i][0], a[4 * i][2])
+                return a
     def getCheckpointFile(self, iteration):
         return 'checkpoint_' + str(iteration) + '.pth.tar'
 
