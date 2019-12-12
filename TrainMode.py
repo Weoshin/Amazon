@@ -19,9 +19,9 @@ ARROW = 1
 # 训练模式的参数
 args = dotdict({
     'num_iter': 10,            # 神经网络训练次数
-    'num_play_game': 10,       # 下“num_play_game”盘棋训练一次NNet
+    'num_play_game': 20,       # 下“num_play_game”盘棋训练一次NNet
     'max_len_queue': 200000,   # 双向列表最大长度
-    'num_mcts_search': 2000,   # 从某状态模拟搜索到叶结点次数
+    'num_mcts_search': 5,   # 从某状态模拟搜索到叶结点次数
     'max_batch_size': 20,      # NNet每次训练的最大数据量
     'Cpuct': 1,                # 置信上限函数中的“温度”超参数
     'arenaCompare': 40,
@@ -84,7 +84,7 @@ class TrainMode:
                 self.batch.pop(0)
             
             # 保存训练数据
-            self.saveTrainExamples(i - 1)
+            self.save_train_examples(i - 1)
 
             # 原batch是多维列表，此处标准化batch
             standard_batch = []
@@ -92,7 +92,7 @@ class TrainMode:
                 # extend() 在列表末尾一次性追加其他序列中多个元素
                 standard_batch.extend(e)
             # 打乱数据，是数据服从独立同分布（排除数据间的相关性）
-            # shuffle(standard_batch)
+            shuffle(standard_batch)
             print('NN训练的batch：', len(standard_batch), '条数据', '                   TrainMode.py-learn()')
 
             # 这里保存的是一个temp也就是一直保存着最近一次的网络，这里是为了和最新的网络进行对弈
@@ -114,7 +114,7 @@ class TrainMode:
             else:
                 print('ACCEPTING NEW MODEL')
                 # 保存当前模型并更新最新模型
-                self.nnet.save_checkpoint(folder=self.args.checkpoint, filename=self.getCheckpointFile(i))
+                self.nnet.save_checkpoint(folder=self.args.checkpoint, filename=self.get_checkpoint_file(i))
                 self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='best.pth.tar')
 
     # 完整下一盘游戏
@@ -165,19 +165,21 @@ class TrainMode:
                 # for i in range(len(a) // 4):
                 #     print(4 * a[i][0], a[4 * i][2])
                 return a
-    def getCheckpointFile(self, iteration):
+
+    @staticmethod
+    def get_checkpoint_file(iteration):
         return 'checkpoint_' + str(iteration) + '.pth.tar'
 
-    def saveTrainExamples(self, iteration):
+    def save_train_examples(self, iteration):
         folder = self.args.checkpoint
         if not os.path.exists(folder):
             os.makedirs(folder)
-        filename = os.path.join(folder, self.getCheckpointFile(iteration)+".examples")
+        filename = os.path.join(folder, self.get_checkpoint_file(iteration) + ".examples")
         with open(filename, "wb+") as f:
             Pickler(f).dump(self.batch)
         f.closed
 
-    def loadTrainExamples(self):
+    def load_train_examples(self):
         modelFile = os.path.join(self.args.load_folder_file[0], self.args.load_folder_file[1])
         examplesFile = modelFile+".examples"
         if not os.path.isfile(examplesFile):

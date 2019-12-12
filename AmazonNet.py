@@ -14,13 +14,11 @@ class AmazonNet(nn.Module):
         :param game:
         :param args:
         """
-
+        super(AmazonNet, self).__init__()
         # game params
         self.board_x, self.board_y = game.get_board_size()
         self.action_size = game.get_action_size()
         self.args = args
-
-        super(AmazonNet, self).__init__()
 
         self.conv1 = nn.Conv2d(1, args.num_channels, 3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(args.num_channels, args.num_channels, 3, stride=1, padding=1)
@@ -44,6 +42,12 @@ class AmazonNet(nn.Module):
         self.fc4 = nn.Linear(512, 1)
 
     def forward(self, s):
+        """
+        定义前向传播的图
+        @params: s :n*n棋盘
+        @return: (pi, v): pi: 3*n*n的概率
+                          v: 输赢概率  [-1, 1]
+        """
         # s: batch_size x board_x x board_y
         s = s.view(-1, 1, self.board_x, self.board_y)
         # batch_size * 1 * board_x * board_y
@@ -65,4 +69,4 @@ class AmazonNet(nn.Module):
         # batch_size x 1
         v = self.fc4(s)
 
-        return F.log_softmax(pi, dim=1), torch.tanh(v)
+        return F.softmax(pi, dim=1), torch.tanh(v)
