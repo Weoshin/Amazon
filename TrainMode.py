@@ -21,12 +21,12 @@ args = dotdict({
     'num_iter': 10,            # 神经网络训练次数
     'num_play_game': 20,       # 下“num_play_game”盘棋训练一次NNet
     'max_len_queue': 200000,   # 双向列表最大长度
-    'num_mcts_search': 5,   # 从某状态模拟搜索到叶结点次数
+    'num_mcts_search': 5,      # 从某状态模拟搜索到叶结点次数
     'max_batch_size': 20,      # NNet每次训练的最大数据量
     'Cpuct': 1,                # 置信上限函数中的“温度”超参数
     'arenaCompare': 40,
     'tempThreshold': 35,       # 探索效率
-    'updateThreshold': 0.55,
+    'updateThreshold': 0.55,   # 新旧网络更新阈值
 
     'checkpoint': './temp/',
     'load_model': False,
@@ -35,7 +35,6 @@ args = dotdict({
 
 
 class TrainMode:
-
     def __init__(self, game, nnet):
         """
         :param game: 棋盘对象
@@ -84,7 +83,7 @@ class TrainMode:
                 self.batch.pop(0)
             
             # 保存训练数据
-            self.save_train_examples(i - 1)
+            self.save_train_examples(i)
 
             # 原batch是多维列表，此处标准化batch
             standard_batch = []
@@ -114,7 +113,7 @@ class TrainMode:
             else:
                 print('ACCEPTING NEW MODEL')
                 # 保存当前模型并更新最新模型
-                self.nnet.save_checkpoint(folder=self.args.checkpoint, filename=self.get_checkpoint_file(i))
+                self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='checkpoint_' + str(i) + '.pth.tar')
                 self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='best.pth.tar')
 
     # 完整下一盘游戏
@@ -166,39 +165,43 @@ class TrainMode:
                 #     print(4 * a[i][0], a[4 * i][2])
                 return a
 
-    @staticmethod
-    def get_checkpoint_file(iteration):
-        return 'checkpoint_' + str(iteration) + '.pth.tar'
-
     def save_train_examples(self, iteration):
+        """
+        保存训练数据（board, pi, v）为
+        @params iteration:迭代次数，保存数据为:checkpoint_iteration.pth.tar.examples
+        """
+        # folder = args.checkpoint ：'./temp/'
         folder = self.args.checkpoint
         if not os.path.exists(folder):
             os.makedirs(folder)
-        filename = os.path.join(folder, self.get_checkpoint_file(iteration) + ".examples")
-        with open(filename, "wb+") as f:
+        file_name = os.path.join(folder, 'checkpoint_' + str(iteration) + '.pth.tar' + ".examples")
+        with open(file_name, "wb+") as f:
             Pickler(f).dump(self.batch)
         f.closed
 
     def load_train_examples(self):
-        modelFile = os.path.join(self.args.load_folder_file[0], self.args.load_folder_file[1])
-        examplesFile = modelFile+".examples"
-        if not os.path.isfile(examplesFile):
-            print(examplesFile)
+        """
+        加载（board, pi, v）数据模型
+        """
+        # load_folder_file[0]:'/models/'; load_folder_file[1]:'best.pth.tar'
+        model_file = os.path.join(self.args.load_folder_file[0], self.args.load_folder_file[1])
+        examples_file = model_file+".examples"
+        if not os.path.isfile(examples_file):
+            print(examples_file)
             r = input("File with trainExamples not found. Continue? [y|n]")
             if r != "y":
                 sys.exit()
         else:
             print("File with trainExamples found. Read it.")
-            with open(examplesFile, "rb") as f:
+            with open(examples_file, "rb") as f:
                 self.batch = Unpickler(f).load()
             f.closed
-            # examples based on the model were already collected (loaded)
             self.skipFirstSelfPlay = True
 
 
 if __name__ == "__main__":
     game = Game(5)
-    nnet = NNet(game)
-    train = TrainMode(game, nnet)
-    pboard = PrintBoard(game)
+    net = NNet(game)
+    train = TrainMode(game, net)
+    # pboard = PrintBoard(game)
     train.learn()

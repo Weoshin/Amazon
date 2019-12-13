@@ -9,13 +9,14 @@ from utils.dotdict import dotdict
 from AmazonNet import AmazonNet as annet
 from utils.bar import Bar
 import torch.optim as optim
+import torch.nn.functional as f
 sys.path.append('../../')
 
 
 args = dotdict({
     'lr': 0.001,
     'dropout': 0.3,
-    'epochs': 100,
+    'epochs': 10,
     'batch_size': 64,
     'cuda': torch.cuda.is_available(),
     'num_channels': 512,
@@ -149,7 +150,7 @@ class NNet:
         @return loss_pi: 概率的损失值
         """
         # print("真值:", labels[0], "输出:",  outputs[0])
-        return -torch.sum(labels*outputs)/labels.size()[0]
+        return 10 * torch.sum((labels - outputs) ** 2).view(-1) / labels.size()[0]
 
     @staticmethod
     def loss_v(labels, outputs):
@@ -163,7 +164,7 @@ class NNet:
 
     def save_checkpoint(self, folder='checkpoint', filename='checkpoint.pth.tar'):
         """
-        保存(board, pi, v)数据
+        保存神经网络模型
         """
         file_path = os.path.join(folder, filename)
         if not os.path.exists(folder):
@@ -172,16 +173,18 @@ class NNet:
         else:
             print("Checkpoint Directory exists! ")
         torch.save({
+            # 保存神经网络模型放到 checkpoint.pth.tar 目录中
             'state_dict': self.nnet.state_dict(),
         }, file_path)
 
     def load_checkpoint(self, folder='checkpoint', filename='checkpoint.pth.tar'):
         # https://github.com/pytorch/examples/blob/master/imagenet/main.py#L98
-        filepath = os.path.join(folder, filename)
-        if not os.path.exists(filepath):
-            raise("No model in path {}".format(filepath))
+        file_path = os.path.join(folder, filename)
+        if not os.path.exists(file_path):
+            raise("No model in path {}".format(file_path))
         map_location = None if args.cuda else 'cpu'
-        checkpoint = torch.load(filepath, map_location=map_location)
+        # 从 checkpoint.pth.tar 中加载模型参数
+        checkpoint = torch.load(file_path, map_location=map_location)
         self.nnet.load_state_dict(checkpoint['state_dict'])
 
 
