@@ -5,6 +5,9 @@ WHITE = 2
 
 
 class PrintAction:
+    """
+    可视化工具：依概率顺序打印MCTS采样后的动作
+    """
     def __init__(self, game):
         self.game = game
         self.board_size = game.board_size

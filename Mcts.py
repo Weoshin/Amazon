@@ -39,8 +39,9 @@ class Mcts:
     def get_best_action(self, board, player):
         """
         使用白棋视角判断最优选择
-        :param board:  当前棋盘
-        :return best_action: 下一步最优动作
+        @params board:  当前棋盘
+                player: 玩家视角
+        @return best_action: 下一步最优动作
         """
         s = self.game.to_string(board)
         for i in range(self.args.num_mcts_search):

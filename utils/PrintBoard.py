@@ -8,6 +8,9 @@ board_size = 5
 
 
 class PrintBoard:
+    """
+    可视化工具：棋盘可视化工具
+    """
     def __init__(self, game):
         self.game = game
         self.board = game.board
