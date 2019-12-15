@@ -6,6 +6,9 @@ sys.path.append('..')
 
 
 class AmazonNet(nn.Module):
+    """
+    亚马逊棋神经网络图定义类
+    """
     def __init__(self, game, args):
         """
         torch.nn.Conv2d(in_channels, out_channels, kernel_size,
@@ -24,7 +27,7 @@ class AmazonNet(nn.Module):
         self.conv2 = nn.Conv2d(args.num_channels, args.num_channels, 3, stride=1, padding=1)
         self.conv3 = nn.Conv2d(args.num_channels, args.num_channels, 3, stride=1)
         self.conv4 = nn.Conv2d(args.num_channels, args.num_channels, 3, stride=1)
-
+        # 泛化数据，归一化，防止
         self.bn1 = nn.BatchNorm2d(args.num_channels)
         self.bn2 = nn.BatchNorm2d(args.num_channels)
         self.bn3 = nn.BatchNorm2d(args.num_channels)
@@ -44,7 +47,7 @@ class AmazonNet(nn.Module):
     def forward(self, s):
         """
         定义前向传播的图
-        @params: s :n*n棋盘
+        @params: s :....张 n*n棋盘
         @return: (pi, v): pi: 3*n*n的概率
                           v: 输赢概率  [-1, 1]
         """

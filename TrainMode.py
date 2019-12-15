@@ -3,11 +3,13 @@ import sys
 import time
 from collections import deque
 from random import shuffle
+import numpy as np
 from Game import Game
 from utils.dotdict import dotdict
 from pickle import Pickler, Unpickler
 from Mcts import Mcts
 from NNet import NNet
+from UpdateNet import UpdateNet
 from utils.PrintBoard import PrintBoard
 
 BLACK = -2
@@ -15,18 +17,17 @@ WHITE = 2
 EMPTY = 0
 ARROW = 1
 
-
 # 训练模式的参数
 args = dotdict({
-    'num_iter': 10,            # 神经网络训练次数
-    'num_play_game': 20,       # 下“num_play_game”盘棋训练一次NNet
-    'max_len_queue': 200000,   # 双向列表最大长度
-    'num_mcts_search': 5,      # 从某状态模拟搜索到叶结点次数
-    'max_batch_size': 20,      # NNet每次训练的最大数据量
-    'Cpuct': 1,                # 置信上限函数中的“温度”超参数
+    'num_iter': 10,  # 神经网络训练次数
+    'num_play_game': 20,  # 下“num_play_game”盘棋训练一次NNet
+    'max_len_queue': 200000,  # 双向列表最大长度
+    'num_mcts_search': 5,  # 从某状态模拟搜索到叶结点次数
+    'max_batch_size': 20,  # NNet每次训练的最大数据量
+    'Cpuct': 1,  # 置信上限函数中的“温度”超参数
     'arenaCompare': 40,
-    'tempThreshold': 35,       # 探索效率
-    'updateThreshold': 0.55,   # 新旧网络更新阈值
+    'tempThreshold': 35,  # 探索效率
+    'updateThreshold': 0.55,  # 新旧网络更新阈值
 
     'checkpoint': './temp/',
     'load_model': False,
@@ -35,6 +36,10 @@ args = dotdict({
 
 
 class TrainMode:
+    """
+    自博弈类
+    """
+
     def __init__(self, game, nnet):
         """
         :param game: 棋盘对象
@@ -46,8 +51,9 @@ class TrainMode:
         self.player = WHITE
         self.game = game
         self.nnet = nnet
+        self.pnet = self.nnet.__class__(self.game)
         self.mcts = Mcts(self.game, self.nnet, self.args)
-        self.batch = []                 # 每次给NNet喂的数据量,但类型不对（多维列表）
+        self.batch = []  # 每次给NNet喂的数据量,但类型不对（多维列表）
         self.skipFirstSelfPlay = False  # can be overriden in loadTrainExamples()
 
     # 调用NNet开始训练
@@ -66,7 +72,8 @@ class TrainMode:
                 # 下“num_play_game”盘棋训练一次NNet
                 for j in range(self.args.num_play_game):
                     # 重置搜索树
-                    print("====================================== 第", j+1, "盘棋 ======================================")
+                    print("====================================== 第", j + 1,
+                          "盘棋 ======================================")
                     self.mcts = Mcts(self.game, self.nnet, self.args)
                     self.player = WHITE
                     iter_train_data += self.play_one_game()
@@ -81,7 +88,7 @@ class TrainMode:
                 print("len(max_batch_size) =", len(self.batch),
                       " => remove the oldest batch")
                 self.batch.pop(0)
-            
+
             # 保存训练数据
             self.save_train_examples(i)
 
@@ -95,15 +102,21 @@ class TrainMode:
             print('NN训练的batch：', len(standard_batch), '条数据', '                   TrainMode.py-learn()')
 
             # 这里保存的是一个temp也就是一直保存着最近一次的网络，这里是为了和最新的网络进行对弈
+            # 将临时网络保存，付给对抗网络
             self.nnet.save_checkpoint(folder=self.args.checkpoint, filename='temp.pth.tar')
-            # self.pnet.load_checkpoint(folder=self.args.checkpoint, filename='temp.pth.tar')
+            self.pnet.load_checkpoint(folder=self.args.checkpoint, filename='temp.pth.tar')
+            pmcts = Mcts(self.game, self.pnet, self.args)
 
             # 开启训练
             self.nnet.train(standard_batch)
+            nmcts = Mcts(self.game, self.nnet, self.args)
 
             print('PITTING AGAINST PREVIOUS VERSION')
-            # 旧、新网路赢的次数 和 平局
-            pwins, nwins, draws = 10, 100, 1
+            # pwins, nwins, draws = 10, 100, 1
+            arena = UpdateNet(lambda x, player: np.argmax(pmcts.get_best_action(x, player)),
+                              lambda x, player: np.argmax(nmcts.get_best_action(x, player)), self.game)
+            # 对抗、本网络赢的次数 和 平局
+            pwins, nwins, draws = arena.playGames(self.args.arenaCompare)
             print('NEW/PREV WINS : %d / %d ; DRAWS : %d' % (nwins, pwins, draws))
             # 如果旧网路和新网路赢得和为0 或 新网络/ 新网络＋旧网路 小于 更新阈值（0.55）则不更新，否则更新成新网络参数
             if pwins + nwins == 0 or float(nwins) / (pwins + nwins) < self.args.updateThreshold:
@@ -142,7 +155,7 @@ class TrainMode:
             one_game_train_data += steps_train_data
             te = time.time()
             if self.player == WHITE:
-                print("                             白棋走：", next_action, '搜索：', int(te-ts), 's')
+                print("                             白棋走：", next_action, '搜索：', int(te - ts), 's')
             else:
                 print("                             黑棋走：", next_action, '搜索：', int(te - ts), 's')
             board, self.player = self.game.get_next_state(board, self.player, next_action)
@@ -185,7 +198,7 @@ class TrainMode:
         """
         # load_folder_file[0]:'/models/'; load_folder_file[1]:'best.pth.tar'
         model_file = os.path.join(self.args.load_folder_file[0], self.args.load_folder_file[1])
-        examples_file = model_file+".examples"
+        examples_file = model_file + ".examples"
         if not os.path.isfile(examples_file):
             print(examples_file)
             r = input("File with trainExamples not found. Continue? [y|n]")

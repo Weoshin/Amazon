@@ -9,21 +9,25 @@ from utils.dotdict import dotdict
 from AmazonNet import AmazonNet as annet
 from utils.bar import Bar
 import torch.optim as optim
+from utils.AverageMeter import AverageMeter
 import torch.nn.functional as f
 sys.path.append('../../')
 
 
 args = dotdict({
-    'lr': 0.001,
-    'dropout': 0.3,
-    'epochs': 10,
-    'batch_size': 64,
+    'lr': 0.001,                        # 学习率or步长
+    'dropout': 0.3,                     # dropout率
+    'epochs': 10,                       # 每次新传入数据后神经网络的训练次数
+    'batch_size': 64,                   #
     'cuda': torch.cuda.is_available(),
-    'num_channels': 512,
+    'num_channels': 512,                # 通道数
 })
 
 
 class NNet:
+    """
+    神经网络训练类
+    """
     def __init__(self, game):
         self.board_size = game.board_size
         self.nnet = annet(game, args)
@@ -41,8 +45,6 @@ class NNet:
     #     return pi, 2 * (random.random() - 0.5)
 
 # 两个问题：
-# 为什么所有棋子（特别是黑棋）都计算成将箭放到皇后起点为概率最大值
-# 为什么黑棋明明在帮白棋下(演员) —> 有可能黑棋的v给反了，导致黑棋输时UCT最大
 # 温度超参数是不是应该随着棋局进行改变？
 # 5*5 开始时可走步数：260 第四步以后可走的步数就基本小于100
 # 可不可以前几步输赢奖励小，后面奖励大。
@@ -125,10 +127,8 @@ class NNet:
 
     def predict(self, board):
         """
-        board: np array with board
+        @params:board: np array with board
         """
-        # timing
-        start = time.time()
         # 转化成浮点型
         board = torch.FloatTensor(board.astype(np.float64))
         if args.cuda:
@@ -147,7 +147,7 @@ class NNet:
         计算概率损失值
         @params labels: [64, 75]真值标签
                 outputs: [64, 75]NN输出值
-        @return loss_pi: 概率的损失值
+        @return loss_pi: 概率的损失函数
         """
         # print("真值:", labels[0], "输出:",  outputs[0])
         return 10 * torch.sum((labels - outputs) ** 2).view(-1) / labels.size()[0]
@@ -158,7 +158,7 @@ class NNet:
         计算奖励损失值
         @params labels: 真值标签
                 outputs: NN输出值
-        @return loss_v: 奖励的损失值
+        @return loss_v: 奖励的损失函数
         """
         return torch.sum((labels - outputs.view(-1)) ** 2) / labels.size()[0]
 
@@ -178,7 +178,9 @@ class NNet:
         }, file_path)
 
     def load_checkpoint(self, folder='checkpoint', filename='checkpoint.pth.tar'):
-        # https://github.com/pytorch/examples/blob/master/imagenet/main.py#L98
+        """
+        加载神经网络模型
+        """
         file_path = os.path.join(folder, filename)
         if not os.path.exists(file_path):
             raise("No model in path {}".format(file_path))
@@ -187,26 +189,3 @@ class NNet:
         checkpoint = torch.load(file_path, map_location=map_location)
         self.nnet.load_state_dict(checkpoint['state_dict'])
 
-
-class AverageMeter(object):
-    """Computes and stores the average and current value
-       Imported from https://github.com/pytorch/examples/blob/master/imagenet/main.py#L247-L262
-    """
-    def __init__(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count

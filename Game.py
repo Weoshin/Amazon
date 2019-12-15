@@ -8,6 +8,9 @@ ARROW = 1
 
 
 class Game:
+    """
+    棋盘定义与棋盘规则类
+    """
     directions = [(1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
 
     def __init__(self, board_size):
